@@ -1,0 +1,101 @@
+﻿@page
+@model ContactCardPage
+@{
+    ViewData["Title"] = "Contact Card Page";
+}
+
+<h1>@ViewData["Title"]</h1>
+
+<form method="post" class="mb-4">
+    <input type="hidden" asp-for="EditingContactId" />
+
+    <div class="mb-2">
+        <label asp-for="NewContact.Name" class="form-label"></label>
+        <input asp-for="NewContact.Name" class="form-control" />
+        <span asp-validation-for="NewContact.Name" class="text-danger"></span>
+    </div>
+
+    <div class="mb-2">
+        <label asp-for="NewContact.Email" class="form-label"></label>
+        <input asp-for="NewContact.Email" class="form-control" />
+        <span asp-validation-for="NewContact.Email" class="text-danger"></span>
+    </div>
+
+    <div class="mb-2">
+        <label asp-for="NewContact.Phone" class="form-label"></label>
+        <input asp-for="NewContact.Phone" class="form-control" />
+        <span asp-validation-for="NewContact.Phone" class="text-danger"></span>
+    </div>
+
+    <button type="submit" class="btn btn-primary">
+        @(Model.EditingContactId.HasValue ? "Update Contact" : "Add Contact")
+    </button>
+
+    @if (Model.EditingContactId.HasValue)
+    {
+        <a href="@Url.Page("Contact_Cards")" class="btn btn-secondary">Cancel</a>
+    }
+</form>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Phone</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var contact in Model.Contacts)
+        {
+        <tr>
+            <td>@contact.Id</td>
+            <td>@contact.Name</td>
+            <td>@contact.Email</td>
+            <td>@contact.Phone</td>
+            <td>
+                    <a href="@Url.Page("Contact_Cards", "Edit", new { id = contact.Id })"
+                       class="btn btn-sm btn-outline-primary me-2" title="Edit">
+                        <i class="fas fa-pen"></i>
+                    </a>
+                    <a href="@Url.Page("Contact_Cards", "Delete", new { id = contact.Id })"
+                       class="btn btn-sm btn-outline-danger" title="Delete"
+                       onclick="return confirm('Are you sure you want to delete this contact?')">
+                        <i class="fas fa-trash"></i>
+                    </a>
+            </td>
+        </tr>
+        }
+    </tbody>
+</table>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+
+    <script>
+        const STORAGE_KEY = 'contactCards';
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const contacts = @Html.Raw(Model.Contacts)
+            saveContactsToStorage(contacts);
+            loadContactsFromStorage();
+        });
+
+        function saveContactsToStorage(contacts) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(contacts));
+            console.log('Contacts saved to localStorage', contacts);
+        }
+
+        function loadContactsFromStorage() {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored) {
+                const contacts = JSON.parse(stored);
+                console.log('Contacts loaded from localStorage', contacts);
+                return contacts;
+            }
+            return [];
+        }
+    </script>
+}
