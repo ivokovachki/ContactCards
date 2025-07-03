@@ -1,24 +1,21 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using ContactCards.Data;
+using ContactCards.Models;
 
 namespace ContactCards.Pages
 {
     public class ContactCardPage : PageModel
     {
         private readonly ILogger<ContactCardPage> _logger;
+        private readonly ContactCardsDbContext _context;
 
-        private static List<Contact> _contacts = new();
-        private static int nextId = 1;
-
-        public ContactCardPage(ILogger<ContactCardPage> logger)
+        public ContactCardPage(ILogger<ContactCardPage> logger, ContactCardsDbContext context)
         {
             _logger = logger;
+            _context = context;
         }
 
         [BindProperty]
@@ -27,15 +24,16 @@ namespace ContactCards.Pages
         [BindProperty]
         public int? EditingContactId { get; set; }
 
-        public string ContactsJson => JsonSerializer.Serialize(_contacts);
+        public List<Contact> Contacts { get; set; } = new();
 
-        public List<Contact> Contacts => _contacts;
-
-        public void OnGet() { }
-
-        public IActionResult OnGetEdit(int id)
+        public async Task OnGetAsync()
         {
-            var contact = _contacts.FirstOrDefault(c => c.Id == id);
+            Contacts = await _context.Contacts.OrderBy(c => c.Name).ToListAsync();
+        }
+
+        public async Task<IActionResult> OnGetEditAsync(int id)
+        {
+            var contact = await _context.Contacts.FindAsync(id);
             if (contact == null)
                 return NotFound();
 
@@ -47,36 +45,46 @@ namespace ContactCards.Pages
             };
 
             EditingContactId = id;
+            Contacts = await _context.Contacts.OrderBy(c => c.Name).ToListAsync();
             return Page();
         }
 
-        public IActionResult OnGetDelete(int id)
+        public async Task<IActionResult> OnPostDeleteAsync(int id)
         {
-            var contact = _contacts.FirstOrDefault(c => c.Id == id);
+            var contact = await _context.Contacts.FindAsync(id);
             if (contact != null)
             {
-                _contacts.Remove(contact);
+                _context.Contacts.Remove(contact);
+                await _context.SaveChangesAsync();
             }
 
             return RedirectToPage();
         }
 
-        public IActionResult OnPost()
+        public async Task<IActionResult> OnPostAsync()
         {
+            // Load contacts for display in case of validation errors
+            Contacts = await _context.Contacts.OrderBy(c => c.Name).ToListAsync();
+
             if (EditingContactId.HasValue)
             {
-                // Editing existing contact
-                if (_contacts.Any(c =>
-                    c.Id != EditingContactId.Value &&
-                    c.Email.Equals(NewContact.Email, StringComparison.OrdinalIgnoreCase)))
+                // Update existing contact
+                var existingContact = await _context.Contacts.FindAsync(EditingContactId.Value);
+                if (existingContact == null)
+                {
+                    ModelState.AddModelError("", "Contact not found.");
+                    return Page();
+                }
+
+                // Check for duplicate email (excluding current contact)
+                if (await _context.Contacts.AnyAsync(c => c.Email.ToLower() == NewContact.Email.ToLower() && c.Id != EditingContactId.Value))
                 {
                     ModelState.AddModelError("NewContact.Email", "Email already exists.");
                     return Page();
                 }
 
-                if (_contacts.Any(c =>
-                    c.Id != EditingContactId.Value &&
-                    c.Phone == NewContact.Phone))
+                // Check for duplicate phone (excluding current contact)
+                if (await _context.Contacts.AnyAsync(c => c.Phone == NewContact.Phone && c.Id != EditingContactId.Value))
                 {
                     ModelState.AddModelError("NewContact.Phone", "Phone number already exists.");
                     return Page();
@@ -85,24 +93,24 @@ namespace ContactCards.Pages
                 if (!ModelState.IsValid)
                     return Page();
 
-                var contact = _contacts.FirstOrDefault(c => c.Id == EditingContactId.Value);
-                if (contact != null)
-                {
-                    contact.Name = NewContact.Name;
-                    contact.Email = NewContact.Email;
-                    contact.Phone = NewContact.Phone;
-                }
+                existingContact.Name = NewContact.Name;
+                existingContact.Email = NewContact.Email;
+                existingContact.Phone = NewContact.Phone;
+
+                await _context.SaveChangesAsync();
             }
             else
             {
-                // Adding new contact
-                if (_contacts.Any(c => c.Email.Equals(NewContact.Email, StringComparison.OrdinalIgnoreCase)))
+                // Add new contact
+                // Check for duplicate email
+                if (await _context.Contacts.AnyAsync(c => c.Email.ToLower() == NewContact.Email.ToLower()))
                 {
                     ModelState.AddModelError("NewContact.Email", "Email already exists.");
                     return Page();
                 }
 
-                if (_contacts.Any(c => c.Phone == NewContact.Phone))
+                // Check for duplicate phone
+                if (await _context.Contacts.AnyAsync(c => c.Phone == NewContact.Phone))
                 {
                     ModelState.AddModelError("NewContact.Phone", "Phone number already exists.");
                     return Page();
@@ -111,14 +119,8 @@ namespace ContactCards.Pages
                 if (!ModelState.IsValid)
                     return Page();
 
-                NewContact.Id = nextId++;
-                _contacts.Add(new Contact
-                {
-                    Id = NewContact.Id,
-                    Name = NewContact.Name,
-                    Email = NewContact.Email,
-                    Phone = NewContact.Phone
-                });
+                _context.Contacts.Add(NewContact);
+                await _context.SaveChangesAsync();
             }
 
             // Reset form
@@ -126,22 +128,6 @@ namespace ContactCards.Pages
             EditingContactId = null;
 
             return RedirectToPage();
-        }
-
-        public class Contact
-        {
-            public int Id { get; set; }
-
-            [Required(ErrorMessage = "Name is required.")]
-            public string Name { get; set; } = string.Empty;
-
-            [Required(ErrorMessage = "Email is required.")]
-            [EmailAddress(ErrorMessage = "Invalid email address.")]
-            public string Email { get; set; } = string.Empty;
-
-            [Required(ErrorMessage = "Phone number is required.")]
-            [RegularExpression(@"^\d{10}$", ErrorMessage = "Phone number must be 10 digits long.")]
-            public string Phone { get; set; } = string.Empty;
         }
     }
 }

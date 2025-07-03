@@ -33,7 +33,7 @@
 
     @if (Model.EditingContactId.HasValue)
     {
-        <a href="@Url.Page("Contact_Cards")" class="btn btn-secondary">Cancel</a>
+    <a href="@Url.Page("Contact_Cards")" class="btn btn-secondary">Cancel</a>
     }
 </form>
 
@@ -56,46 +56,26 @@
             <td>@contact.Email</td>
             <td>@contact.Phone</td>
             <td>
-                    <a href="@Url.Page("Contact_Cards", "Edit", new { id = contact.Id })"
-                       class="btn btn-sm btn-outline-primary me-2" title="Edit">
-                        <i class="fas fa-pen"></i>
-                    </a>
-                    <a href="@Url.Page("Contact_Cards", "Delete", new { id = contact.Id })"
-                       class="btn btn-sm btn-outline-danger" title="Delete"
-                       onclick="return confirm('Are you sure you want to delete this contact?')">
+                <a href="@Url.Page("Contact_Cards", "Edit", new { id = contact.Id })"
+                   class="btn btn-sm btn-outline-primary me-2" title="Edit">
+                    <i class="fas fa-pen"></i>
+                </a>
+                <form method="post" style="display: inline-block;" 
+                      asp-page-handler="Delete" asp-route-id="@contact.Id"
+                      onsubmit="return confirm('Are you sure you want to delete this contact?')">
+                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
                         <i class="fas fa-trash"></i>
-                    </a>
+                    </button>
+                </form>
             </td>
         </tr>
         }
     </tbody>
 </table>
 
+
+
+
 @section Scripts {
-    <partial name="_ValidationScriptsPartial" />
-
-    <script>
-        const STORAGE_KEY = 'contactCards';
-
-        document.addEventListener('DOMContentLoaded', function () {
-            const contacts = @Html.Raw(Model.Contacts)
-            saveContactsToStorage(contacts);
-            loadContactsFromStorage();
-        });
-
-        function saveContactsToStorage(contacts) {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(contacts));
-            console.log('Contacts saved to localStorage', contacts);
-        }
-
-        function loadContactsFromStorage() {
-            const stored = localStorage.getItem(STORAGE_KEY);
-            if (stored) {
-                const contacts = JSON.parse(stored);
-                console.log('Contacts loaded from localStorage', contacts);
-                return contacts;
-            }
-            return [];
-        }
-    </script>
-}
+        <partial name="_ValidationScriptsPartial" />
+    }
